@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOMBMAT</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&family=Russo+One&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0d0d0d;
+  --panel:#111418;
+  --green:#00ff88;
+  --green-dim:#00a855;
+  --red:#ff2d2d;
+  --red-dim:#8b0000;
+  --amber:#ffaa00;
+  --amber-dim:#7a5000;
+  --wire1:#ff4444;
+  --wire2:#44aaff;
+  --wire3:#ffff44;
+  --wire4:#44ff88;
+  --border:#1e2530;
+  --lcd:#0a1a0a;
+  --lcd-text:#00ff88;
+}
+
+body{
+  background:var(--bg);
+  font-family:'Share Tech Mono',monospace;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  position:relative;
+}
+
+/* scanline overlay */
+body::after{
+  content:'';
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);
+  pointer-events:none;
+  z-index:999;
+}
+
+/* background grid */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(0,255,136,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,255,136,0.03) 1px,transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;
+}
+
+/* ══════════ SCREENS ══════════ */
+.screen{display:none;width:100%;max-width:520px;padding:1rem;}
+.screen.active{display:block;}
+
+/* ══════════ MENU ══════════ */
+#menuScreen{text-align:center;}
+
+.logo-wrap{position:relative;margin-bottom:2rem;}
+
+.logo{
+  font-family:'Black Ops One',cursive;
+  font-size:clamp(3.5rem,12vw,6rem);
+  color:var(--green);
+  text-shadow:0 0 20px var(--green),0 0 60px rgba(0,255,136,0.3);
+  letter-spacing:0.1em;
+  animation:logoPulse 2s ease-in-out infinite;
+  position:relative;
+  display:inline-block;
+}
+
+@keyframes logoPulse{
+  0%,100%{text-shadow:0 0 20px var(--green),0 0 60px rgba(0,255,136,0.3);}
+  50%{text-shadow:0 0 40px var(--green),0 0 100px rgba(0,255,136,0.5),0 0 140px rgba(0,255,136,0.2);}
+}
+
+.logo-sub{
+  font-family:'Share Tech Mono',monospace;
+  font-size:0.7rem;
+  letter-spacing:0.4em;
+  color:var(--amber);
+  margin-top:-0.5rem;
+  text-transform:uppercase;
+}
+
+/* bomb SVG in menu */
+.menu-bomb{
+  width:140px;height:140px;
+  margin:0 auto 2rem;
+  animation:bombFloat 3s ease-in-out infinite;
+  filter:drop-shadow(0 0 20px rgba(0,255,136,0.3));
+}
+
+@keyframes bombFloat{
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-10px);}
+}
+
+.menu-bomb .fuse-spark{
+  animation:spark 0.4s ease-in-out infinite alternate;
+  transform-origin:50px 10px;
+}
+@keyframes spark{
+  from{opacity:1;transform:scale(1);}
+  to{opacity:0.3;transform:scale(0.7);}
+}
+
+.high-score-display{
+  font-size:0.75rem;
+  color:var(--amber-dim);
+  margin-bottom:0.5rem;
+  letter-spacing:0.15em;
+}
+.high-score-val{color:var(--amber);font-size:1rem;}
+
+.play-btn{
+  display:inline-block;
+  font-family:'Black Ops One',cursive;
+  font-size:1.6rem;
+  letter-spacing:0.2em;
+  color:#0d0d0d;
+  background:var(--green);
+  border:none;
+  padding:1rem 3.5rem;
+  cursor:pointer;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  transition:all 0.15s;
+  text-transform:uppercase;
+  position:relative;
+  margin-top:1rem;
+}
+
+.play-btn::before{
+  content:'';
+  position:absolute;
+  inset:-3px;
+  background:var(--green-dim);
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  z-index:-1;
+}
+
+.play-btn:hover{
+  background:#fff;
+  transform:scale(1.05);
+  box-shadow:0 0 30px rgba(0,255,136,0.6);
+}
+
+.play-btn:active{transform:scale(0.97);}
+
+.menu-hint{
+  margin-top:1.5rem;
+  font-size:0.65rem;
+  color:#333;
+  letter-spacing:0.1em;
+}
+
+/* ══════════ GAME SCREEN ══════════ */
+#gameScreen{position:relative;}
+
+/* bomb casing */
+.bomb-casing{
+  background:linear-gradient(160deg,#1a1e24 0%,#0e1114 50%,#1a1e24 100%);
+  border:2px solid #2a3040;
+  border-radius:12px;
+  padding:1.5rem;
+  position:relative;
+  box-shadow:
+    0 0 0 1px #0a0f14,
+    0 0 40px rgba(0,0,0,0.8),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* rivet corners */
+.bomb-casing::before,.bomb-casing::after{
+  content:'';
+  position:absolute;
+  width:8px;height:8px;
+  border-radius:50%;
+  background:radial-gradient(circle,#3a4050,#1a2030);
+  border:1px solid #0a1020;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.bomb-casing::before{top:8px;left:8px;box-shadow:16px 0 0 #1a2030, 0 16px 0 #1a2030;}
+
+/* wires strip */
+.wires{
+  display:flex;
+  gap:6px;
+  margin-bottom:1rem;
+  padding:6px 0;
+  border-bottom:1px solid #1a2030;
+}
+.wire{
+  flex:1;height:4px;
+  border-radius:2px;
+  position:relative;
+}
+.wire::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  border-radius:2px;
+  animation:wireFlicker 3s ease-in-out infinite;
+}
+.wire-r{background:var(--wire1);}
+.wire-b{background:var(--wire2);}
+.wire-y{background:var(--wire3);}
+.wire-g{background:var(--wire4);}
+@keyframes wireFlicker{0%,100%{opacity:1}50%{opacity:0.7}}
+
+/* header row */
+.hud{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:1rem;
+}
+
+/* lives */
+.lives{display:flex;gap:6px;}
+.heart{font-size:1.2rem;transition:all 0.3s;}
+.heart.dead{filter:grayscale(1);opacity:0.2;}
+
+/* score */
+.score-box{
+  text-align:center;
+}
+.score-label{font-size:0.55rem;letter-spacing:0.2em;color:#334;}
+.score-val{
+  font-family:'Russo One',sans-serif;
+  font-size:1.4rem;
+  color:var(--amber);
+  text-shadow:0 0 10px rgba(255,170,0,0.4);
+}
+
+/* question counter */
+.q-count{
+  font-size:0.6rem;
+  color:#334;
+  letter-spacing:0.1em;
+  text-align:right;
+}
+.q-num{color:var(--green);font-size:0.85rem;}
+
+/* ── LCD TIMER ── */
+.timer-wrap{
+  background:var(--lcd);
+  border:2px solid #1a2a1a;
+  border-radius:6px;
+  padding:0.6rem 1rem;
+  margin-bottom:1rem;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  box-shadow:inset 0 0 20px rgba(0,0,0,0.8),0 0 10px rgba(0,255,136,0.1);
+  position:relative;
+  overflow:hidden;
+}
+
+.timer-wrap::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(0,255,136,0.03) 0%,transparent 100%);
+}
+
+.timer-icon{font-size:1.5rem;animation:tick 1s step-end infinite;}
+@keyframes tick{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.timer-digits{
+  font-family:'Share Tech Mono',monospace;
+  font-size:2.8rem;
+  color:var(--lcd-text);
+  text-shadow:0 0 10px var(--green),0 0 30px rgba(0,255,136,0.2);
+  letter-spacing:0.05em;
+  flex:1;
+  text-align:center;
+  transition:color 0.3s;
+}
+
+.timer-digits.danger{
+  color:var(--red);
+  text-shadow:0 0 10px var(--red),0 0 30px rgba(255,45,45,0.3);
+  animation:dangerPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes dangerPulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.03);}
+}
+
+.timer-bar-wrap{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  height:3px;
+  background:#0a150a;
+}
+.timer-bar{
+  height:100%;
+  background:var(--green);
+  transition:width 1s linear,background 0.3s;
+}
+.timer-bar.danger{background:var(--red);}
+
+/* ── QUESTION PANEL ── */
+.question-panel{
+  background:#0a0e14;
+  border:1px solid #1e2530;
+  border-radius:8px;
+  padding:1.25rem 1.5rem;
+  margin-bottom:1rem;
+  min-height:80px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+
+.question-panel::before{
+  content:'SORU';
+  position:absolute;
+  top:-8px;left:12px;
+  font-size:0.55rem;
+  letter-spacing:0.2em;
+  color:#334;
+  background:#0a0e14;
+  padding:0 6px;
+}
+
+.question-text{
+  font-family:'Share Tech Mono',monospace;
+  font-size:clamp(1.1rem,4vw,1.5rem);
+  color:#e8f0ff;
+  text-align:center;
+  letter-spacing:0.05em;
+  line-height:1.5;
+}
+
+/* ── DISPLAY ── */
+.display{
+  background:var(--lcd);
+  border:1px solid #1a2a1a;
+  border-radius:6px;
+  padding:0.6rem 1rem;
+  margin-bottom:0.75rem;
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:0.5rem;
+  box-shadow:inset 0 0 15px rgba(0,0,0,0.6);
+}
+
+.display-input{
+  font-family:'Share Tech Mono',monospace;
+  font-size:1.6rem;
+  color:var(--lcd-text);
+  text-shadow:0 0 8px rgba(0,255,136,0.4);
+  flex:1;
+  text-align:right;
+  letter-spacing:0.05em;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.display-cursor{
+  width:2px;height:1.5rem;
+  background:var(--green);
+  animation:blink 0.8s step-end infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── KEYPAD ── */
+.keypad{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:6px;
+}
+
+.key{
+  background:linear-gradient(160deg,#1e2530,#141820);
+  border:1px solid #2a3340;
+  border-radius:6px;
+  padding:0.75rem 0.5rem;
+  font-family:'Share Tech Mono',monospace;
+  font-size:1.1rem;
+  color:#c0d0e0;
+  cursor:pointer;
+  text-align:center;
+  transition:all 0.1s;
+  user-select:none;
+  position:relative;
+  box-shadow:0 3px 0 #0a0f14,inset 0 1px 0 rgba(255,255,255,0.05);
+  -webkit-tap-highlight-color:transparent;
+}
+
+.key:hover{
+  background:linear-gradient(160deg,#2a3545,#1e2535);
+  color:#fff;
+  border-color:#3a4555;
+}
+
+.key:active,.key.pressed{
+  transform:translateY(2px);
+  box-shadow:0 1px 0 #0a0f14,inset 0 1px 0 rgba(0,0,0,0.2);
+  background:linear-gradient(160deg,#141820,#1e2530);
+}
+
+.key.green{
+  background:linear-gradient(160deg,#0a2015,#061510);
+  border-color:#0a3020;
+  color:var(--green);
+}
+.key.green:hover{background:linear-gradient(160deg,#0d2a1c,#0a1e14);box-shadow:0 3px 0 #020a05,0 0 10px rgba(0,255,136,0.2),inset 0 1px 0 rgba(0,255,136,0.1);}
+
+.key.red{
+  background:linear-gradient(160deg,#200a0a,#150606);
+  border-color:#3a0a0a;
+  color:var(--red);
+}
+.key.red:hover{background:linear-gradient(160deg,#2a0d0d,#1e0808);box-shadow:0 3px 0 #0a0202,0 0 10px rgba(255,45,45,0.2),inset 0 1px 0 rgba(255,45,45,0.1);}
+
+.key.amber{
+  background:linear-gradient(160deg,#201500,#150e00);
+  border-color:#3a2200;
+  color:var(--amber);
+}
+
+.key.span2{grid-column:span 2;}
+
+/* ── FEEDBACK ── */
+.feedback{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.2s;
+}
+.feedback.show{opacity:1;pointer-events:all;}
+
+.feedback-inner{
+  font-family:'Black Ops One',cursive;
+  font-size:4rem;
+  letter-spacing:0.1em;
+  text-align:center;
+  animation:feedbackAnim 0.4s ease-out;
+}
+@keyframes feedbackAnim{
+  from{transform:scale(0.5);opacity:0;}
+  to{transform:scale(1);opacity:1;}
+}
+
+.feedback-inner.correct{color:var(--green);text-shadow:0 0 40px var(--green);}
+.feedback-inner.wrong{color:var(--red);text-shadow:0 0 40px var(--red);}
+.feedback-inner .feedback-sub{font-size:1rem;display:block;margin-top:0.5rem;letter-spacing:0.2em;}
+
+/* ── EXPLOSION ── */
+#explosionOverlay{
+  position:fixed;inset:0;
+  background:radial-gradient(circle at 50% 50%,#ff6600,#ff2200,#8b0000,transparent);
+  opacity:0;
+  z-index:200;
+  pointer-events:none;
+  transition:opacity 0.1s;
+}
+#explosionOverlay.boom{
+  animation:explosion 0.8s ease-out forwards;
+}
+@keyframes explosion{
+  0%{opacity:0;transform:scale(0.3);}
+  20%{opacity:1;transform:scale(1.2);}
+  60%{opacity:0.8;transform:scale(1);}
+  100%{opacity:0;transform:scale(1);}
+}
+
+/* ── GAME OVER ── */
+#gameOverScreen{text-align:center;}
+
+.gameover-title{
+  font-family:'Black Ops One',cursive;
+  font-size:3rem;
+  color:var(--red);
+  text-shadow:0 0 30px var(--red);
+  margin-bottom:0.5rem;
+  animation:shake 0.5s ease-in-out;
+}
+@keyframes shake{
+  0%,100%{transform:translateX(0);}
+  20%{transform:translateX(-8px);}
+  40%{transform:translateX(8px);}
+  60%{transform:translateX(-4px);}
+  80%{transform:translateX(4px);}
+}
+
+.gameover-sub{
+  font-size:0.75rem;
+  letter-spacing:0.2em;
+  color:#664;
+  margin-bottom:2rem;
+}
+
+.gameover-stats{
+  background:#0a0e14;
+  border:1px solid #2a1a1a;
+  border-radius:8px;
+  padding:1.5rem;
+  margin-bottom:2rem;
+}
+
+.stat-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:0.5rem 0;
+  border-bottom:1px solid #1a1a1a;
+  font-size:0.8rem;
+}
+.stat-row:last-child{border-bottom:none;}
+.stat-label{color:#446;}
+.stat-val{color:var(--amber);font-size:1rem;}
+.stat-val.best{color:var(--green);}
+
+.menu-btn{
+  font-family:'Black Ops One',cursive;
+  font-size:1.1rem;
+  letter-spacing:0.15em;
+  color:#0d0d0d;
+  background:var(--green);
+  border:none;
+  padding:0.85rem 2.5rem;
+  cursor:pointer;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  transition:all 0.15s;
+}
+.menu-btn:hover{background:#fff;transform:scale(1.03);}
+
+/* +15 toast */
+.time-toast{
+  position:fixed;
+  top:30%;
+  left:50%;
+  transform:translateX(-50%);
+  font-family:'Black Ops One',cursive;
+  font-size:1.5rem;
+  color:var(--amber);
+  text-shadow:0 0 20px var(--amber);
+  pointer-events:none;
+  animation:toastUp 1s ease-out forwards;
+  z-index:150;
+}
+@keyframes toastUp{
+  from{opacity:1;transform:translateX(-50%) translateY(0);}
+  to{opacity:0;transform:translateX(-50%) translateY(-60px);}
+}
+
+/* correct flash */
+@keyframes correctFlash{
+  0%,100%{background:var(--bg);}
+  50%{background:rgba(0,255,136,0.05);}
+}
+body.flash-correct{animation:correctFlash 0.3s ease-out;}
+
+/* wrong shake */
+@keyframes wrongShake{
+  0%,100%{transform:translateX(0);}
+  25%{transform:translateX(-6px);}
+  75%{transform:translateX(6px);}
+}
+
+/* level badge */
+.level-badge{
+  position:absolute;
+  top:-10px;right:12px;
+  background:var(--amber);
+  color:#0d0d0d;
+  font-size:0.55rem;
+  font-weight:bold;
+  letter-spacing:0.15em;
+  padding:2px 8px;
+  clip-path:polygon(4px 0%,100% 0%,calc(100% - 4px) 100%,0% 100%);
+}
+</style>
+</head>
+<body>
+
+<div id="explosionOverlay"></div>
+
+<!-- ══ MENU ══ -->
+<div id="menuScreen" class="screen active">
+  <div class="logo-wrap">
+    <div class="logo">BOMBMAT</div>
+    <div class="logo-sub">matematik · bul · kapat</div>
+  </div>
+
+  <svg class="menu-bomb" viewBox="0 0 100 120">
+    <!-- fuse -->
+    <path d="M52 18 Q65 5 72 15 Q78 22 85 12" stroke="#888" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- spark -->
+    <g class="fuse-spark">
+      <circle cx="85" cy="12" r="4" fill="#ffaa00"/>
+      <circle cx="85" cy="12" r="7" fill="rgba(255,170,0,0.3)"/>
+    </g>
+    <!-- body -->
+    <circle cx="50" cy="68" r="38" fill="url(#bombGrad)" stroke="#333" stroke-width="2"/>
+    <!-- shine -->
+    <ellipse cx="38" cy="52" rx="10" ry="6" fill="rgba(255,255,255,0.07)" transform="rotate(-30,38,52)"/>
+    <!-- skull -->
+    <text x="50" y="78" text-anchor="middle" font-size="32" fill="rgba(0,0,0,0.4)">💣</text>
+    <defs>
+      <radialGradient id="bombGrad" cx="40%" cy="35%">
+        <stop offset="0%" stop-color="#2a2e36"/>
+        <stop offset="100%" stop-color="#0d0f12"/>
+      </radialGradient>
+    </defs>
+  </svg>
+
+  <div class="high-score-display">EN YÜKSEK PUAN: <span class="high-score-val" id="menuHighScore">0</span></div>
+
+  <button class="play-btn" onclick="startGame()">▶ PLAY</button>
+
+  <div class="menu-hint">Her doğru cevap = +15 saniye · 3 can · 2dk başlangıç</div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div id="gameScreen" class="screen">
+  <div class="bomb-casing">
+    <div class="wires">
+      <div class="wire wire-r"></div>
+      <div class="wire wire-b"></div>
+      <div class="wire wire-y"></div>
+      <div class="wire wire-g"></div>
+    </div>
+
+    <div class="hud">
+      <div class="lives" id="livesDisplay"></div>
+      <div class="score-box">
+        <div class="score-label">PUAN</div>
+        <div class="score-val" id="scoreDisplay">0</div>
+      </div>
+      <div class="q-count">SORU<br><span class="q-num" id="qNumDisplay">1</span></div>
+    </div>
+
+    <div class="timer-wrap">
+      <span class="timer-icon">💣</span>
+      <div class="timer-digits" id="timerDisplay">60</div>
+      <div class="timer-bar-wrap">
+        <div class="timer-bar" id="timerBar"></div>
+      </div>
+    </div>
+
+    <div class="question-panel">
+      <div class="level-badge" id="levelBadge">KOLAY</div>
+      <div class="question-text" id="questionText">Yükleniyor...</div>
+    </div>
+
+    <div class="display">
+      <div class="display-input" id="displayInput">0</div>
+      <div class="display-cursor"></div>
+    </div>
+
+    <div class="keypad">
+      <div class="key" onclick="keyPress('7')">7</div>
+      <div class="key" onclick="keyPress('8')">8</div>
+      <div class="key" onclick="keyPress('9')">9</div>
+      <div class="key red" onclick="keyPress('DEL')">⌫</div>
+
+      <div class="key" onclick="keyPress('4')">4</div>
+      <div class="key" onclick="keyPress('5')">5</div>
+      <div class="key" onclick="keyPress('6')">6</div>
+      <div class="key amber" onclick="keyPress('NEG')">±</div>
+
+      <div class="key" onclick="keyPress('1')">1</div>
+      <div class="key" onclick="keyPress('2')">2</div>
+      <div class="key" onclick="keyPress('3')">3</div>
+      <div class="key amber" onclick="keyPress('.')">.</div>
+
+      <div class="key span2" onclick="keyPress('0')">0</div>
+      <div class="key red" onclick="keyPress('CLR')">C</div>
+      <div class="key green" onclick="keyPress('OK')">✓</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="gameOverScreen" class="screen">
+  <div class="gameover-title">💥 PATLADI!</div>
+  <div class="gameover-sub">TÜM CANLAR TÜKENDİ</div>
+
+  <div class="gameover-stats">
+    <div class="stat-row">
+      <span class="stat-label">PUAN</span>
+      <span class="stat-val" id="goScore">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">ÇÖZÜLEN SORU</span>
+      <span class="stat-val" id="goSolved">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">EN YÜKSEK PUAN</span>
+      <span class="stat-val best" id="goHighScore">0</span>
+    </div>
+  </div>
+
+  <button class="menu-btn" onclick="goMenu()">↩ ANA MENÜ</button>
+</div>
+
+<!-- feedback overlay -->
+<div class="feedback" id="feedback">
+  <div class="feedback-inner" id="feedbackInner"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let lives, score, questionNum, timeLeft, maxTime, timerInterval, currentAnswer, inputVal, highScore;
+
+highScore = parseInt(localStorage.getItem('bombmat_hs') || '0');
+document.getElementById('menuHighScore').textContent = highScore;
+
+// ══════════════════════════════════════════
+// QUESTION GENERATOR
+// ══════════════════════════════════════════
+function generateQuestion(qNum) {
+  const level = qNum <= 3 ? 0 : qNum <= 7 ? 1 : qNum <= 12 ? 2 : 3;
+  const types = level === 0
+    ? ['linear','linear','addition']
+    : level === 1
+    ? ['linear','quadratic_simple','sqrt_simple']
+    : level === 2
+    ? ['quadratic_simple','sqrt','power','two_step']
+    : ['quadratic','sqrt_hard','power_hard','two_step_hard'];
+
+  const type = types[Math.floor(Math.random() * types.length)];
+  const labels = ['KOLAY','ORTA','ZOR','EKSTRİM'];
+  document.getElementById('levelBadge').textContent = labels[level];
+
+  return makeQuestion(type);
+}
+
+function ri(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+
+function makeQuestion(type) {
+  switch(type) {
+    case 'addition': {
+      const a=ri(10,50),b=ri(10,50);
+      return {text:`${a} + x = ${a+b}`, answer:b, display:`${a} + x = ${a+b}`};
+    }
+    case 'linear': {
+      const a=ri(2,9),b=ri(1,20),ans=ri(1,15);
+      const c=a*ans+b;
+      return {text:`${a}x + ${b} = ${c}`, answer:ans, display:`${a}x + ${b} = ${c}`};
+    }
+    case 'two_step': {
+      const a=ri(2,6),b=ri(1,10),c=ri(1,8),ans=ri(2,10);
+      const res=a*ans+b-c;
+      return {text:`${a}x + ${b} − ${c} = ${res}`, answer:ans, display:`${a}x + ${b} − ${c} = ${res}`};
+    }
+    case 'two_step_hard': {
+      const a=ri(3,9),b=ri(2,15),c=ri(1,12),ans=ri(3,12);
+      const res=a*ans-b+c;
+      return {text:`${a}x − ${b} + ${c} = ${res}`, answer:ans, display:`${a}x − ${b} + ${c} = ${res}`};
+    }
+    case 'sqrt_simple': {
+      const ans=ri(2,9);
+      const sq=ans*ans;
+      return {text:`√${sq} = x`, answer:ans, display:`√${sq} = x`};
+    }
+    case 'sqrt': {
+      const ans=ri(3,12);
+      const sq=ans*ans;
+      return {text:`√${sq} + ${ri(1,5)} = x + ${ri(1,3)}`, answer:null, _sq:sq, _ans:ans,
+        get answer(){return ans;},
+        display:`√${sq} = x`};
+    }
+    case 'sqrt_hard': {
+      const ans=ri(4,15);
+      const sq=ans*ans;
+      const add=ri(2,8);
+      const total=ans+add;
+      return {text:`√${sq} + ${add} = x`, answer:total, display:`√${sq} + ${add} = x`};
+    }
+    case 'quadratic_simple': {
+      const ans=ri(2,8);
+      const sq=ans*ans;
+      return {text:`x² = ${sq}`, answer:ans, display:`x² = ${sq}`, hint:'(pozitif kök)'};
+    }
+    case 'quadratic': {
+      const ans=ri(2,10);
+      const b=ri(1,8);
+      const sq=ans*ans;
+      const res=sq+b;
+      return {text:`x² + ${b} = ${res}`, answer:ans, display:`x² + ${b} = ${res}`, hint:'(x > 0)'};
+    }
+    case 'power': {
+      const base=ri(2,5),exp=ri(2,3);
+      const ans=Math.pow(base,exp);
+      return {text:`${base}^${exp} = x`, answer:ans, display:`${base}³ = x` };
+    }
+    case 'power_hard': {
+      const ans=ri(2,4);
+      const exp=3;
+      const res=Math.pow(ans,exp);
+      return {text:`x³ = ${res}`, answer:ans, display:`x³ = ${res}`};
+    }
+    default: return makeQuestion('linear');
+  }
+}
+
+// Format question text for display (with superscript/radical symbols)
+function formatQuestion(q) {
+  let t = q.text;
+  t = t.replace(/\^(\d+)/g, (m,e) => {
+    const sups = {'2':'²','3':'³','4':'⁴','5':'⁵'};
+    return sups[e] || `^${e}`;
+  });
+  return t;
+}
+
+// ══════════════════════════════════════════
+// GAME LOGIC
+// ══════════════════════════════════════════
+function startGame() {
+  lives = 3;
+  score = 0;
+  questionNum = 1;
+  timeLeft = 120;
+  maxTime = 120;
+  inputVal = '';
+
+  showScreen('gameScreen');
+  updateHUD();
+  loadQuestion();
+  startTimer();
+}
+
+function loadQuestion() {
+  const q = generateQuestion(questionNum);
+  currentAnswer = q.answer;
+  document.getElementById('questionText').innerHTML = formatQuestion(q);
+  if(q.hint) document.getElementById('questionText').innerHTML += `<br><small style="font-size:0.7rem;color:#446;">${q.hint}</small>`;
+  inputVal = '';
+  updateDisplay();
+  document.getElementById('qNumDisplay').textContent = questionNum;
+
+  // bounce animation
+  const qp = document.getElementById('questionText');
+  qp.style.animation='none';
+  void qp.offsetWidth;
+  qp.style.animation='feedbackAnim 0.3s ease-out';
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    if(timeLeft <= 0) {
+      clearInterval(timerInterval);
+      loseLife('timeout');
+    }
+  }, 1000);
+}
+
+function updateTimer() {
+  const el = document.getElementById('timerDisplay');
+  const bar = document.getElementById('timerBar');
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  el.textContent = mins + ':' + (secs < 10 ? '0' + secs : secs);
+  const pct = Math.min(100, (timeLeft / maxTime) * 100);
+  bar.style.width = pct + '%';
+  const danger = timeLeft <= 15;
+  el.classList.toggle('danger', danger);
+  bar.classList.toggle('danger', danger);
+}
+
+function updateHUD() {
+  // Lives
+  const lc = document.getElementById('livesDisplay');
+  lc.innerHTML = '';
+  for(let i=0;i<3;i++){
+    const h = document.createElement('span');
+    h.className = 'heart' + (i >= lives ? ' dead' : '');
+    h.textContent = '❤️';
+    lc.appendChild(h);
+  }
+  document.getElementById('scoreDisplay').textContent = score;
+}
+
+function updateDisplay() {
+  document.getElementById('displayInput').textContent = inputVal || '0';
+}
+
+// ══════════════════════════════════════════
+// KEYPAD
+// ══════════════════════════════════════════
+function keyPress(key) {
+  // visual press
+  const keys = document.querySelectorAll('.key');
+  keys.forEach(k => { if(k.textContent.trim() === key || k.getAttribute('onclick')?.includes(`'${key}'`)) { k.classList.add('pressed'); setTimeout(()=>k.classList.remove('pressed'),120); }});
+
+  if(key === 'CLR') { inputVal = ''; }
+  else if(key === 'DEL') { inputVal = inputVal.slice(0,-1); }
+  else if(key === 'NEG') { inputVal = inputVal.startsWith('-') ? inputVal.slice(1) : (inputVal ? '-'+inputVal : '-'); }
+  else if(key === 'OK') { checkAnswer(); return; }
+  else if(key === '.') { if(!inputVal.includes('.')) inputVal += '.'; }
+  else { if(inputVal.length < 8) inputVal += key; }
+
+  updateDisplay();
+}
+
+// keyboard support
+document.addEventListener('keydown', e => {
+  if(document.getElementById('gameScreen').classList.contains('active')) {
+    if(e.key >= '0' && e.key <= '9') keyPress(e.key);
+    else if(e.key === 'Enter') keyPress('OK');
+    else if(e.key === 'Backspace') keyPress('DEL');
+    else if(e.key === 'Escape') keyPress('CLR');
+    else if(e.key === '-') keyPress('NEG');
+    else if(e.key === '.') keyPress('.');
+  }
+});
+
+// ══════════════════════════════════════════
+// ANSWER CHECK
+// ══════════════════════════════════════════
+function checkAnswer() {
+  const userVal = parseFloat(inputVal);
+  if(isNaN(userVal)) { shakeBomb(); return; }
+
+  const correct = Math.abs(userVal - currentAnswer) < 0.01;
+
+  if(correct) {
+    score += 15;
+    timeLeft = Math.min(timeLeft + 15, 180);
+    maxTime = Math.max(maxTime, timeLeft);
+    questionNum++;
+    updateHUD();
+    updateTimer();
+    showFeedback(true);
+    showToast('+15 SANİYE ⏱');
+    setTimeout(() => { loadQuestion(); }, 700);
+  } else {
+    loseLife('wrong');
+  }
+}
+
+function loseLife(reason) {
+  lives--;
+  updateHUD();
+  clearInterval(timerInterval);
+
+  if(lives <= 0) {
+    explodeAndEnd();
+  } else {
+    showFeedback(false, reason === 'timeout' ? 'SÜRE DOLDU!' : 'YANLIŞ!');
+    shakeBomb();
+    setTimeout(() => {
+      // reset time for new chance
+      timeLeft = Math.max(timeLeft, 15);
+      loadQuestion();
+      startTimer();
+    }, 1200);
+  }
+}
+
+function shakeBomb() {
+  const c = document.querySelector('.bomb-casing');
+  c.style.animation='none';
+  void c.offsetWidth;
+  c.style.animation='wrongShake 0.4s ease-out';
+  setTimeout(()=>c.style.animation='',400);
+}
+
+function explodeAndEnd() {
+  const overlay = document.getElementById('explosionOverlay');
+  overlay.classList.add('boom');
+
+  // screen flash red
+  document.body.style.background='#300';
+  setTimeout(()=>document.body.style.background='',300);
+
+  // boom sound via AudioContext
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1,ctx.sampleRate*0.5,ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/8000);
+    const src=ctx.createBufferSource();
+    src.buffer=buf;
+    const gain=ctx.createGain();
+    gain.gain.setValueAtTime(0.4,ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5);
+    src.connect(gain);gain.connect(ctx.destination);
+    src.start();
+  } catch(e){}
+
+  setTimeout(() => {
+    overlay.classList.remove('boom');
+    showGameOver();
+  }, 900);
+}
+
+function showGameOver() {
+  if(score > highScore) {
+    highScore = score;
+    localStorage.setItem('bombmat_hs', highScore);
+  }
+  document.getElementById('goScore').textContent = score;
+  document.getElementById('goSolved').textContent = questionNum - 1;
+  document.getElementById('goHighScore').textContent = highScore;
+  document.getElementById('menuHighScore').textContent = highScore;
+  showScreen('gameOverScreen');
+}
+
+function goMenu() {
+  clearInterval(timerInterval);
+  showScreen('menuScreen');
+}
+
+// ══════════════════════════════════════════
+// FEEDBACK
+// ══════════════════════════════════════════
+function showFeedback(correct, msg) {
+  const fb = document.getElementById('feedback');
+  const fi = document.getElementById('feedbackInner');
+  fi.className = 'feedback-inner ' + (correct ? 'correct' : 'wrong');
+  fi.innerHTML = correct
+    ? '✓ DOĞRU!<span class="feedback-sub">+15 PUAN</span>'
+    : `✗ ${msg||'YANLIŞ!'}<span class="feedback-sub">-1 CAN</span>`;
+  fb.classList.add('show');
+  setTimeout(()=>fb.classList.remove('show'), correct ? 600 : 1000);
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'time-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),1000);
+}
+
+// ══════════════════════════════════════════
+// SCREEN MANAGER
+// ══════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+</script>
+</body>
+</html>
